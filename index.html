@@ -345,6 +345,7 @@
         const DAILY_PROFIT_AMOUNT = initialPrincipal * DAILY_PROFIT_RATE;
         const PROFIT_PER_MS = DAILY_PROFIT_AMOUNT / MS_PER_DAY;
         
+        // This is the core persistence: Initial Principal + Accumulated Profit over the total time elapsed
         return initialPrincipal + (PROFIT_PER_MS * totalMillisecondsElapsed);
     };
 
