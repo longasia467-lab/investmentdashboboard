@@ -297,6 +297,7 @@
     let DB = null;
     let USER_ID = null;
     let START_DATE_MS = null; // Stored as milliseconds since epoch
+    let CURRENT_PRINCIPAL = DEFAULT_INITIAL_PRINCIPAL_INR; // New variable to hold the principal
 
     // --- Chart Instance Variable ---
     let projectionChartInstance = null; 
@@ -464,7 +465,10 @@
     };
 
     // --- Main Update Function ---
-    window.updateSimulation = (initialPrincipal) => {
+    window.updateSimulation = () => {
+        // Use the globally stored CURRENT_PRINCIPAL
+        const initialPrincipal = CURRENT_PRINCIPAL; 
+        
         if (!START_DATE_MS) return;
 
         const today = new Date();
@@ -533,19 +537,19 @@
             // Re-get User ID after successful sign-in
             USER_ID = AUTH.currentUser?.uid || 'anonymous';
             
-            // --- FIX: Use the dynamically obtained USER_ID in the document path ---
+            // Use the dynamically obtained USER_ID in the document path
             const configDocRef = doc(DB, "artifacts", appId, "users", USER_ID, "config", "investment");
-            // --- END FIX ---
             
             // 2. Load or Initialize Data
             const docSnapshot = await getDoc(configDocRef);
-            let initialPrincipal = DEFAULT_INITIAL_PRINCIPAL_INR;
+            let initialPrincipal = DEFAULT_INITIAL_PRINCIPAL_INR; // Default value from code
 
             if (docSnapshot.exists()) {
                 const data = docSnapshot.data();
                 START_DATE_MS = data.startDateMs;
-                // For safety, we trust the principal defined in the code as this is a fixed demo, but we load the persistent date.
-                console.log("Loaded persistent start date:", new Date(START_DATE_MS).toLocaleDateString());
+                // Retrieve principal from Firestore, but fallback to code default if not present
+                initialPrincipal = data.initialPrincipal || DEFAULT_INITIAL_PRINCIPAL_INR; 
+                console.log("Loaded persistent start date and principal.");
             } else {
                 // If no persistent data exists, set today as the starting date
                 const todayMs = new Date().getTime();
@@ -556,15 +560,19 @@
                 
                 await setDoc(configDocRef, initialData);
                 START_DATE_MS = todayMs;
-                console.log("Initialized new persistent start date:", new Date(START_DATE_MS).toLocaleDateString());
+                console.log("Initialized new persistent start date and principal.");
             }
+            
+            // *** FIX: Store the retrieved principal globally ***
+            CURRENT_PRINCIPAL = initialPrincipal; 
 
             // 3. Start Simulation
             const fixedStartDate = new Date(START_DATE_MS);
             startDateDisplayEl.textContent = `Calculated since ${fixedStartDate.toLocaleDateString('en-US')}.`;
 
-            window.updateSimulation(initialPrincipal); 
-            setInterval(() => window.updateSimulation(initialPrincipal), 1000); 
+            // updateSimulation reads CURRENT_PRINCIPAL globally
+            window.updateSimulation(); 
+            setInterval(window.updateSimulation, 1000); 
 
         } catch (e) {
             console.error("Fatal initialization error. Using default ephemeral start date.", e);
@@ -573,10 +581,11 @@
             const today = new Date();
             START_DATE_MS = today.getTime();
             const initialPrincipal = DEFAULT_INITIAL_PRINCIPAL_INR;
+            CURRENT_PRINCIPAL = initialPrincipal; // Set fallback principal
             
             startDateDisplayEl.textContent = `Calculated since ${today.toLocaleDateString('en-US')}. (Ephemeral)`;
-            window.updateSimulation(initialPrincipal); 
-            setInterval(() => window.updateSimulation(initialPrincipal), 1000); 
+            window.updateSimulation(); 
+            setInterval(window.updateSimulation, 1000); 
         }
     };
 
